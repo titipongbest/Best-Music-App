@@ -77,6 +77,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     init {
+        prefs.setBatterySaver(false) // ปิดโหมดประหยัดพลังงาน (เอาออกจากเมนูแล้ว)
         player.connect()
     }
 

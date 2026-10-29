@@ -40,7 +40,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ModeComment
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material.icons.rounded.Favorite
@@ -99,7 +98,6 @@ fun PlayerScreen(
     vm: MainViewModel,
     actions: ActivityActions,
     onClose: () -> Unit,
-    onOpenLyrics: () -> Unit,
     onFullscreenVideo: () -> Unit,
     onMore: (Track, PlayerColors) -> Unit,
 ) {
@@ -294,19 +292,6 @@ fun PlayerScreen(
                         .onFailure { actions.toast("ไม่พบอีควอไลเซอร์ในเครื่องนี้") }
                 }) {
                     Icon(Icons.Rounded.Tune, "อีควอไลเซอร์", tint = colors.secondary, modifier = Modifier.size(32.dp))
-                }
-                Spacer(Modifier.weight(1f))
-                Row(
-                    Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(Color.White.copy(alpha = 0.06f))
-                        .clickable(onClick = onOpenLyrics)
-                        .padding(horizontal = 30.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Outlined.ModeComment, null, tint = colors.secondary, modifier = Modifier.size(28.dp))
-                    Spacer(Modifier.width(14.dp))
-                    Text("เนื้อเพลง", color = colors.secondary, fontSize = 21.sp, fontWeight = FontWeight.Bold)
                 }
                 Spacer(Modifier.weight(1f))
                 Box(

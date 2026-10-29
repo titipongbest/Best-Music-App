@@ -23,13 +23,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.outlined.Alarm
-import androidx.compose.material.icons.outlined.BatterySaver
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Speed
-import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
@@ -42,8 +40,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -77,11 +73,11 @@ interface ActivityActions {
     fun toast(msg: String)
 }
 
-private enum class SheetDialog { NONE, PLAYLIST, SPEED, SLEEP, EDIT, CONFIRM_DELETE, CONFIRM_HIDE }
+private enum class SheetDialog { NONE, PLAYLIST, SPEED, SLEEP, EDIT, CONFIRM_DELETE }
 
 /**
  * เมนู "⋮" แบบในภาพตัวอย่าง: ปก+ชื่อ+ปุ่มแก้ไข แล้วตามด้วยรายการ
- * เพิ่มลงในเพลย์ลิสต์ / แบ่งปัน / ความเร็ว / ทำเป็นเสียงริงโทน / ตั้งเวลาปิดเครื่อง / โหมดประหยัดพลังงาน / ซ่อน / ลบ
+ * เพิ่มลงในเพลย์ลิสต์ / แบ่งปัน / ความเร็ว / ทำเป็นเสียงริงโทน / ตั้งเวลาหยุดเล่น / ลบ
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,7 +90,6 @@ fun TrackMoreSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val playerState by vm.playerState.collectAsState()
-    val batterySaver by vm.prefs.batterySaver.collectAsState()
     var dialog by remember { mutableStateOf(SheetDialog.NONE) }
 
     ModalBottomSheet(
@@ -161,24 +156,10 @@ fun TrackMoreSheet(
                 }
             }
             SheetItem(
-                Icons.Outlined.Alarm, "ตั้งเวลาปิดเครื่อง",
+                Icons.Outlined.Alarm, "ตั้งเวลาหยุดเล่น",
                 trailing = { sleepLabel(playerState)?.let { TrailingText(it, colors.accent) } },
             ) { dialog = SheetDialog.SLEEP }
-            SheetItem(
-                Icons.Outlined.BatterySaver, "โหมดประหยัดพลังงาน",
-                trailing = {
-                    Switch(
-                        checked = batterySaver,
-                        onCheckedChange = { vm.setBatterySaver(it) },
-                        colors = SwitchDefaults.colors(
-                            checkedTrackColor = colors.accent,
-                            checkedThumbColor = colors.background,
-                        ),
-                    )
-                },
-            ) { vm.setBatterySaver(!batterySaver) }
             SheetDivider()
-            SheetItem(Icons.Outlined.VisibilityOff, "ซ่อน") { dialog = SheetDialog.CONFIRM_HIDE }
             SheetItem(Icons.Outlined.Delete, "ลบ") {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
                     actions.delete(track) // ระบบจะแสดงหน้ายืนยันเอง
@@ -227,17 +208,6 @@ fun TrackMoreSheet(
         SheetDialog.EDIT -> EditInfoDialog(
             track = track,
             onSave = { t, a -> vm.editInfo(track, t, a); dialog = SheetDialog.NONE },
-            onDismiss = { dialog = SheetDialog.NONE },
-        )
-        SheetDialog.CONFIRM_HIDE -> ConfirmDialog(
-            title = "ซ่อนเพลงนี้?",
-            text = "\"${track.title}\" จะไม่แสดงในคลังเพลง (แสดงกลับได้จากเมนูในหน้าหลัก)",
-            confirm = "ซ่อน",
-            onConfirm = {
-                vm.hide(track)
-                dialog = SheetDialog.NONE
-                onDismiss()
-            },
             onDismiss = { dialog = SheetDialog.NONE },
         )
         SheetDialog.CONFIRM_DELETE -> ConfirmDialog(
@@ -386,7 +356,7 @@ private fun SleepTimerDialog(state: PlayerState, onPick: (Int) -> Unit, onDismis
     val active = state.sleepEndAt > 0 || state.sleepEndOfTrack
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("ตั้งเวลาปิด") },
+        title = { Text("ตั้งเวลาหยุดเล่น") },
         text = {
             Column {
                 options.forEach { m -> DialogOption("$m นาที") { onPick(m) } }

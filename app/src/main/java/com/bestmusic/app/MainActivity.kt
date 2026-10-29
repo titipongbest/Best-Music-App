@@ -350,7 +350,6 @@ private fun AppNavHost(
                 vm = vm,
                 actions = actions,
                 onClose = { nav.popBackStack() },
-                onOpenLyrics = { nav.navigate(Routes.LYRICS) },
                 onFullscreenVideo = { nav.navigate(Routes.VIDEO) },
                 onMore = openMoreColored,
             )
