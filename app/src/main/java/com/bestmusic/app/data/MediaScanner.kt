@@ -33,6 +33,7 @@ object MediaScanner {
             add(MediaStore.Audio.Media.DURATION)
             add(MediaStore.Audio.Media.DATA)
             add(MediaStore.Audio.Media.DATE_ADDED)
+            add(MediaStore.Audio.Media.DATE_MODIFIED)
             add(MediaStore.Audio.Media.DISPLAY_NAME)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) add(MediaStore.MediaColumns.RELATIVE_PATH)
         }.toTypedArray()
@@ -61,6 +62,8 @@ object MediaScanner {
                     folderName = folderName,
                     isVideo = false,
                     dateAdded = c.long(MediaStore.Audio.Media.DATE_ADDED),
+                    dateModified = c.long(MediaStore.Audio.Media.DATE_MODIFIED)
+                        .takeIf { it > 0 } ?: (fileModifiedSec(path)),
                 )
             }
         }
@@ -75,6 +78,7 @@ object MediaScanner {
             add(MediaStore.Video.Media.DURATION)
             add(MediaStore.Video.Media.DATA)
             add(MediaStore.Video.Media.DATE_ADDED)
+            add(MediaStore.Video.Media.DATE_MODIFIED)
             add(MediaStore.Video.Media.DISPLAY_NAME)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 add(MediaStore.MediaColumns.ARTIST)
@@ -104,6 +108,8 @@ object MediaScanner {
                     folderName = folderName,
                     isVideo = true,
                     dateAdded = c.long(MediaStore.Video.Media.DATE_ADDED),
+                    dateModified = c.long(MediaStore.Video.Media.DATE_MODIFIED)
+                        .takeIf { it > 0 } ?: (fileModifiedSec(path)),
                 )
             }
         }
@@ -131,6 +137,9 @@ object MediaScanner {
         val rel = relativePath?.trimEnd('/') ?: ""
         return rel to (rel.substringAfterLast('/').ifBlank { "Music" })
     }
+
+    private fun fileModifiedSec(path: String): Long =
+        runCatching { File(path).lastModified() / 1000 }.getOrDefault(0L)
 
     private fun Cursor.idx(col: String) = getColumnIndex(col)
     private fun Cursor.long(col: String): Long = idx(col).let { if (it >= 0 && !isNull(it)) getLong(it) else 0L }

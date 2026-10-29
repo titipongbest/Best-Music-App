@@ -16,6 +16,8 @@ data class Track(
     val folderName: String,
     val isVideo: Boolean,
     val dateAdded: Long,
+    /** วินาที: เวลาแก้ไขไฟล์ ใช้เรียงเมื่อ dateAdded เท่ากัน (เช่นสแกนเพลงเข้าพร้อมกันทีเดียว) */
+    val dateModified: Long = 0,
 ) {
     /** คีย์ที่ไม่ซ้ำกันระหว่างเสียงกับวิดีโอ ใช้เป็น mediaId ของ ExoPlayer ด้วย */
     val key: String get() = keyOf(isVideo, id)
@@ -54,6 +56,13 @@ enum class SortOrder(val label: String) {
     DURATION_LONG("ความยาว (มากไปน้อย)"),
     DURATION_SHORT("ความยาว (น้อยไปมาก)");
 
+    private companion object {
+        /** เรียงตามวันที่เพิ่ม → วันที่แก้ไขไฟล์ → ลำดับที่ระบบบันทึก (_ID) กันกรณีวันที่เท่ากันหมด */
+        val byDate: Comparator<Track> = compareBy<Track> { it.dateAdded }
+            .thenBy { it.dateModified }
+            .thenBy { it.id }
+    }
+
     fun apply(list: List<Track>): List<Track> = when (this) {
         DEFAULT -> list
         TITLE_ASC -> list.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title })
@@ -62,8 +71,8 @@ enum class SortOrder(val label: String) {
             compareBy<Track, String>(String.CASE_INSENSITIVE_ORDER) { it.artist }
                 .thenBy(String.CASE_INSENSITIVE_ORDER) { it.title },
         )
-        DATE_NEW -> list.sortedByDescending { it.dateAdded }
-        DATE_OLD -> list.sortedBy { it.dateAdded }
+        DATE_NEW -> list.sortedWith(byDate.reversed())
+        DATE_OLD -> list.sortedWith(byDate)
         DURATION_LONG -> list.sortedByDescending { it.durationMs }
         DURATION_SHORT -> list.sortedBy { it.durationMs }
     }
