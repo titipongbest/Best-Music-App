@@ -56,9 +56,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         combine(allTracks, prefs.hidden) { list, hidden -> list.filterNot { it.key in hidden } }
             .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    val pinnedFolders: StateFlow<List<String>> = prefs.pinnedFolders
+
+    /** โฟลเดอร์ทั้งหมด โดยโฟลเดอร์ที่ปักหมุดอยู่ด้านบน */
     val folders: StateFlow<List<Folder>> =
-        tracks.map { MediaScanner.groupByFolder(it) }
-            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+        combine(tracks.map { MediaScanner.groupByFolder(it) }, prefs.pinnedFolders) { all, pinned ->
+            val rank = pinned.withIndex().associate { (i, p) -> p to i }
+            all.sortedBy { rank[it.path] ?: Int.MAX_VALUE }
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    fun togglePin(path: String) = prefs.togglePin(path)
 
     val videos: StateFlow<List<Track>> =
         tracks.map { list -> list.filter { it.isVideo } }
@@ -125,6 +132,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun createPlaylist(name: String, key: String?) = prefs.createPlaylist(name.trim(), key)
     fun addToPlaylist(name: String, key: String) = prefs.addToPlaylist(name, key)
     fun removeFromPlaylist(name: String, key: String) = prefs.removeFromPlaylist(name, key)
+    fun removeAllFromPlaylist(name: String, tracks: List<Track>) =
+        prefs.removeAllFromPlaylist(name, tracks.map { it.key })
     fun deletePlaylist(name: String) = prefs.deletePlaylist(name)
     fun setBatterySaver(on: Boolean) = prefs.setBatterySaver(on)
 

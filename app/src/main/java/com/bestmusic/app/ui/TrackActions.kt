@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.outlined.Alarm
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.RemoveCircleOutline
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Share
@@ -86,6 +87,7 @@ fun TrackMoreSheet(
     colors: PlayerColors,
     vm: MainViewModel,
     actions: ActivityActions,
+    playlistName: String? = null,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -138,6 +140,13 @@ fun TrackMoreSheet(
             }
 
             SheetItem(Icons.AutoMirrored.Rounded.PlaylistAdd, "เพิ่มลงในเพลย์ลิสต์") { dialog = SheetDialog.PLAYLIST }
+            if (playlistName != null) {
+                SheetItem(Icons.Outlined.RemoveCircleOutline, "นำออกจากเพลย์ลิสต์") {
+                    vm.removeFromPlaylist(playlistName, track.key)
+                    actions.toast("นำออกจาก \"$playlistName\" แล้ว")
+                    onDismiss()
+                }
+            }
             SheetItem(Icons.Outlined.Share, "แบ่งปัน") { actions.share(track) }
             SheetDivider()
             SheetItem(

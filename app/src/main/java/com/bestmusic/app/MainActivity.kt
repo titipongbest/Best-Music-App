@@ -221,7 +221,7 @@ private object Routes {
     fun playlist(name: String) = "playlist/${Uri.encode(name)}"
 }
 
-private data class SheetRequest(val track: Track, val colors: PlayerColors)
+private data class SheetRequest(val track: Track, val colors: PlayerColors, val playlist: String? = null)
 
 @Composable
 private fun BestMusicApp(
@@ -249,7 +249,10 @@ private fun BestMusicApp(
 
     Column(Modifier.fillMaxSize().background(AppBg)) {
         Box(Modifier.weight(1f)) {
-            AppNavHost(nav, vm, actions, openPlayer, openMore) { t, c -> sheet = SheetRequest(t, c) }
+            AppNavHost(
+                nav, vm, actions, openPlayer, openMore,
+                openMoreInPlaylist = { t, name -> sheet = SheetRequest(t, PlayerColors.Default, name) },
+            ) { t, c -> sheet = SheetRequest(t, c) }
         }
         val showMini = current != null && !selecting && route in setOf(Routes.HOME, Routes.FOLDER, Routes.PLAYLIST, Routes.SEARCH)
         if (showMini) Box(Modifier.navigationBarsPadding()) { MiniPlayer(vm, onOpen = openPlayer) }
@@ -257,7 +260,7 @@ private fun BestMusicApp(
     }
 
     sheet?.let { req ->
-        TrackMoreSheet(req.track, req.colors, vm, actions) { sheet = null }
+        TrackMoreSheet(req.track, req.colors, vm, actions, playlistName = req.playlist) { sheet = null }
     }
 }
 
@@ -268,6 +271,7 @@ private fun AppNavHost(
     actions: ActivityActions,
     openPlayer: () -> Unit,
     openMore: (Track) -> Unit,
+    openMoreInPlaylist: (Track, String) -> Unit,
     openMoreColored: (Track, PlayerColors) -> Unit,
 ) {
     NavHost(
@@ -328,7 +332,8 @@ private fun AppNavHost(
                 actions = actions,
                 onBack = { nav.popBackStack() },
                 onOpenPlayer = openPlayer,
-                onMore = openMore,
+                onMore = { openMoreInPlaylist(it, name) },
+                playlistName = name,
                 extraMenu = { dismiss ->
                     DropdownMenuItem(
                         text = { Text("ลบเพลย์ลิสต์") },

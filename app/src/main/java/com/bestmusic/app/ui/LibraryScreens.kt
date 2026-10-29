@@ -1,7 +1,9 @@
 package com.bestmusic.app.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
@@ -28,7 +30,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Checklist
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Folder
@@ -81,6 +85,7 @@ fun HomeScreen(
     onMore: (Track) -> Unit,
 ) {
     val folders by vm.folders.collectAsState()
+    val pinned by vm.pinnedFolders.collectAsState()
     val videos by vm.videos.collectAsState()
     val favorites by vm.favorites.collectAsState()
     val playlists by vm.playlists.collectAsState()
@@ -138,10 +143,41 @@ fun HomeScreen(
                 0 -> if (folders.isEmpty()) EmptyState(loading, "ไม่พบไฟล์เพลงหรือวิดีโอในเครื่อง") else
                     LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
                         items(folders, key = { it.path }) { f ->
-                            FolderRow(f.name, buildString {
-                                append("${f.audioCount} เพลง")
-                                if (f.videoCount > 0) append(" · ${f.videoCount} MV")
-                            }, f.tracks.firstOrNull()) { onOpenFolder(f.path) }
+                            val isPinned = f.path in pinned
+                            var rowMenu by remember { mutableStateOf(false) }
+                            Box {
+                                FolderRow(
+                                    f.name,
+                                    buildString {
+                                        append("${f.audioCount} เพลง")
+                                        if (f.videoCount > 0) append(" · ${f.videoCount} MV")
+                                    },
+                                    f.tracks.firstOrNull(),
+                                    pinned = isPinned,
+                                    onLongClick = { rowMenu = true },
+                                ) { onOpenFolder(f.path) }
+                                DropdownMenu(
+                                    expanded = rowMenu,
+                                    onDismissRequest = { rowMenu = false },
+                                    offset = androidx.compose.ui.unit.DpOffset(72.dp, 0.dp),
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text(if (isPinned) "เลิกปักหมุด" else "ปักหมุดไว้ด้านบน") },
+                                        leadingIcon = {
+                                            Icon(
+                                                if (isPinned) Icons.Outlined.PushPin else Icons.Rounded.PushPin,
+                                                null, tint = AppAccent,
+                                            )
+                                        },
+                                        onClick = { vm.togglePin(f.path); rowMenu = false },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("เล่นทั้งหมด") },
+                                        leadingIcon = { Icon(Icons.Rounded.PlayArrow, null) },
+                                        onClick = { rowMenu = false; vm.play(f.tracks, 0); onOpenPlayer() },
+                                    )
+                                }
+                            }
                         }
                     }
 
@@ -202,16 +238,20 @@ private fun EmptyState(loading: Boolean, text: String) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun FolderRow(
     name: String,
     subtitle: String,
     cover: Track?,
     icon: androidx.compose.ui.graphics.vector.ImageVector = Icons.Rounded.Folder,
+    pinned: Boolean = false,
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(56.dp)) {
@@ -227,6 +267,10 @@ private fun FolderRow(
             Text(name, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(subtitle, color = TextSecondary, fontSize = 13.sp)
         }
+        if (pinned) Icon(
+            Icons.Rounded.PushPin, "ปักหมุดแล้ว", tint = AppAccent,
+            modifier = Modifier.padding(end = 8.dp).size(20.dp),
+        )
     }
 }
 
@@ -291,6 +335,7 @@ fun TrackListScreen(
     onOpenPlayer: () -> Unit,
     onMore: (Track) -> Unit,
     extraMenu: (@Composable (dismiss: () -> Unit) -> Unit)? = null,
+    playlistName: String? = null,
 ) {
     var menu by remember { mutableStateOf(false) }
     val order by vm.sortOrder.collectAsState()
@@ -309,6 +354,7 @@ fun TrackListScreen(
             initialSelected = initialSelection.toSet(),
             vm = vm,
             actions = actions,
+            playlistName = playlistName,
             onExit = { selecting = false },
         )
         return

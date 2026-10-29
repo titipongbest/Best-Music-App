@@ -29,6 +29,7 @@ import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
 import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.RemoveCircleOutline
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.rounded.CheckCircle
@@ -105,7 +106,7 @@ fun SortButton(vm: MainViewModel) {
 //  Multi-select (แบบในภาพตัวอย่าง: "0 เลือกแล้ว" + แถบเครื่องมือด้านล่าง)
 // =====================================================================
 
-private enum class SelectDialog { NONE, PLAYLIST, HIDE, DELETE }
+private enum class SelectDialog { NONE, PLAYLIST, HIDE, DELETE, REMOVE }
 
 @Composable
 fun SelectionScreen(
@@ -114,6 +115,7 @@ fun SelectionScreen(
     vm: MainViewModel,
     actions: ActivityActions,
     onExit: () -> Unit,
+    playlistName: String? = null,
 ) {
     var selected by rememberSaveable { mutableStateOf(initialSelected.toList()) }
     val selectedSet = remember(selected) { selected.toSet() }
@@ -202,7 +204,11 @@ fun SelectionScreen(
                 done("เพิ่ม ${chosen.size} รายการให้เล่นต่อไปแล้ว")
             }
             BarAction(Icons.Outlined.Share, "แบ่งปัน", enabled) { actions.shareMany(chosen) }
-            BarAction(Icons.Outlined.VisibilityOff, "ซ่อน", enabled) { dialog = SelectDialog.HIDE }
+            if (playlistName != null) {
+                BarAction(Icons.Outlined.RemoveCircleOutline, "นำออก", enabled) { dialog = SelectDialog.REMOVE }
+            } else {
+                BarAction(Icons.Outlined.VisibilityOff, "ซ่อน", enabled) { dialog = SelectDialog.HIDE }
+            }
             BarAction(Icons.Outlined.Delete, "ลบ", enabled) {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
                     actions.deleteMany(chosen) // ระบบจะถามยืนยันเอง
@@ -231,6 +237,17 @@ fun SelectionScreen(
             text = "ไฟล์ที่เลือกจะถูกลบออกจากเครื่องอย่างถาวร",
             confirm = "ลบ",
             onConfirm = { dialog = SelectDialog.NONE; actions.deleteMany(chosen); onExit() },
+            onDismiss = { dialog = SelectDialog.NONE },
+        )
+        SelectDialog.REMOVE -> ConfirmDialog(
+            title = "นำ ${chosen.size} รายการออกจากเพลย์ลิสต์?",
+            text = "นำออกจาก \"$playlistName\" เท่านั้น ไฟล์ในเครื่องจะไม่ถูกลบ",
+            confirm = "นำออก",
+            onConfirm = {
+                playlistName?.let { vm.removeAllFromPlaylist(it, chosen) }
+                dialog = SelectDialog.NONE
+                done("นำออกแล้ว ${chosen.size} รายการ")
+            },
             onDismiss = { dialog = SelectDialog.NONE },
         )
         SelectDialog.NONE -> Unit

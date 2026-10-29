@@ -41,6 +41,20 @@ class UserPrefs(context: Context) {
         sp.edit().putString(K_SORT, order.name).apply()
     }
 
+    // ---------- Pinned folders ----------
+    private val _pinned = MutableStateFlow(
+        sp.getString(K_PINNED, "")!!.split('\n').filter { it.isNotBlank() },
+    )
+    /** โฟลเดอร์ที่ปักหมุด (อันที่ปักล่าสุดอยู่บนสุด) */
+    val pinnedFolders: StateFlow<List<String>> = _pinned.asStateFlow()
+
+    fun togglePin(path: String) {
+        val list = _pinned.value.toMutableList()
+        if (!list.remove(path)) list.add(0, path)
+        _pinned.value = list
+        sp.edit().putString(K_PINNED, list.joinToString("\n")).apply()
+    }
+
     // ---------- Favorites ----------
     fun toggleFavorite(key: String) {
         val s = _favorites.value.toMutableSet()
@@ -84,8 +98,11 @@ class UserPrefs(context: Context) {
         })
     }
 
-    fun removeFromPlaylist(name: String, key: String) {
-        savePlaylists(_playlists.value.map { if (it.name == name) it.copy(keys = it.keys - key) else it })
+    fun removeFromPlaylist(name: String, key: String) = removeAllFromPlaylist(name, listOf(key))
+
+    fun removeAllFromPlaylist(name: String, keys: Collection<String>) {
+        val drop = keys.toSet()
+        savePlaylists(_playlists.value.map { if (it.name == name) it.copy(keys = it.keys.filterNot { k -> k in drop }) else it })
     }
 
     fun deletePlaylist(name: String) {
@@ -147,5 +164,6 @@ class UserPrefs(context: Context) {
         const val K_OVERRIDES = "overrides"
         const val K_SAVER = "battery_saver"
         const val K_SORT = "sort_order"
+        const val K_PINNED = "pinned_folders"
     }
 }
