@@ -89,11 +89,17 @@ fun HomeScreen(
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var menu by remember { mutableStateOf(false) }
     var newPlaylist by remember { mutableStateOf(false) }
+    var about by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().background(AppBg).statusBarsPadding()) {
         // ---- Header ----
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 4.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Best music", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = AppAccent, modifier = Modifier.weight(1f))
+            AppLogo(38.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Best music", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = AppAccent, lineHeight = 28.sp)
+                AppCredit()
+            }
             if (loading) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp, color = AppAccent)
             IconButton(onClick = onOpenSearch) { Icon(Icons.Rounded.Search, "ค้นหา", tint = Color.White) }
             IconButton(onClick = { vm.scan() }) { Icon(Icons.Rounded.Refresh, "สแกนใหม่", tint = TextSecondary) }
@@ -101,6 +107,7 @@ fun HomeScreen(
                 IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "เมนู", tint = TextSecondary) }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(text = { Text("แสดงเพลงที่ซ่อนทั้งหมด") }, onClick = { vm.unhideAll(); menu = false })
+                    DropdownMenuItem(text = { Text("เกี่ยวกับแอป ($APP_VERSION)") }, onClick = { about = true; menu = false })
                 }
             }
         }
@@ -114,7 +121,7 @@ fun HomeScreen(
                 val sel = i == tab
                 Text(
                     label,
-                    color = if (sel) Color(0xFF2A1520) else Color(0xFFDDDDDD),
+                    color = if (sel) OnAccent else Color(0xFFDDDDDD),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier
@@ -179,6 +186,7 @@ fun HomeScreen(
         }
     }
 
+    if (about) AboutDialog { about = false }
     if (newPlaylist) TextInputDialog(
         title = "สร้างเพลย์ลิสต์", label = "ชื่อเพลย์ลิสต์", confirm = "สร้าง",
         onConfirm = { vm.createPlaylist(it, null); newPlaylist = false },
@@ -335,7 +343,7 @@ fun TrackListScreen(
             Button(
                 onClick = { vm.play(sorted, 0); onOpenPlayer() },
                 enabled = sorted.isNotEmpty(),
-                colors = ButtonDefaults.buttonColors(containerColor = AppAccent, contentColor = Color(0xFF2A1520)),
+                colors = ButtonDefaults.buttonColors(containerColor = AppAccent, contentColor = OnAccent),
                 modifier = Modifier.weight(1f).height(48.dp),
             ) {
                 Icon(Icons.Rounded.PlayArrow, null)

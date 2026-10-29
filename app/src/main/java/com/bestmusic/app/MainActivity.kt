@@ -59,6 +59,8 @@ import com.bestmusic.app.data.Track
 import com.bestmusic.app.ui.ActivityActions
 import com.bestmusic.app.ui.AppAccent
 import com.bestmusic.app.ui.AppBg
+import com.bestmusic.app.ui.OnAccent
+import com.bestmusic.app.ui.AppCredit
 import com.bestmusic.app.ui.BestMusicTheme
 import com.bestmusic.app.ui.FullscreenVideoScreen
 import com.bestmusic.app.ui.HomeScreen
@@ -374,6 +376,8 @@ private fun PermissionScreen(onRequest: () -> Unit, onOpenSettings: () -> Unit) 
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
     ) {
+        com.bestmusic.app.ui.AppLogo(84.dp)
+        Spacer(Modifier.height(16.dp))
         Text("Best music", color = AppAccent, fontSize = 36.sp, fontWeight = FontWeight.ExtraBold)
         Spacer(Modifier.height(16.dp))
         Text(
@@ -383,10 +387,12 @@ private fun PermissionScreen(onRequest: () -> Unit, onOpenSettings: () -> Unit) 
         Spacer(Modifier.height(28.dp))
         Button(
             onClick = onRequest,
-            colors = ButtonDefaults.buttonColors(containerColor = AppAccent, contentColor = Color(0xFF2A1520)),
+            colors = ButtonDefaults.buttonColors(containerColor = AppAccent, contentColor = OnAccent),
         ) { Text("อนุญาตการเข้าถึง", fontWeight = FontWeight.Bold) }
         androidx.compose.material3.TextButton(onClick = onOpenSettings) {
             Text("เปิดการตั้งค่าแอป", color = TextSecondary)
         }
+        Spacer(Modifier.height(40.dp))
+        AppCredit()
     }
 }

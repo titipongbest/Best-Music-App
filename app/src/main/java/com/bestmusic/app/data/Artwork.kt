@@ -104,7 +104,7 @@ data class PlayerColors(
         val Default = PlayerColors(
             background = Color(0xFF2B2B2D),
             sheet = Color(0xFF353537),
-            accent = Color(0xFFD9C3C4),
+            accent = Color(0xFFFFD43B),
         )
         val BatterySaver = PlayerColors(
             background = Color.Black,

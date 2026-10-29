@@ -59,7 +59,7 @@ fun Artwork(
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .background(Brush.linearGradient(listOf(Color(0xFF3B2A35), Color(0xFF25252B)))),
+                        .background(Brush.linearGradient(listOf(Color(0xFF3A3420), Color(0xFF25252B)))),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
@@ -78,12 +78,12 @@ fun Artwork(
 fun MvBadge(modifier: Modifier = Modifier) {
     Text(
         "MV",
-        color = Color.White,
+        color = OnAccent,
         fontSize = 10.sp,
         fontWeight = FontWeight.Bold,
         modifier = modifier
             .clip(RoundedCornerShape(4.dp))
-            .background(AppAccent.copy(alpha = 0.85f))
+            .background(AppAccent)
             .padding(horizontal = 5.dp, vertical = 1.dp),
     )
 }

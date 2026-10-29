@@ -9,13 +9,15 @@ import androidx.compose.ui.graphics.Color
 val AppBg = Color(0xFF1B1B1D)
 val AppSurface = Color(0xFF262628)
 val AppSurfaceHigh = Color(0xFF303033)
-val AppAccent = Color(0xFFF48FB1)
+val AppAccent = Color(0xFFFFD43B)
+/** สีตัวอักษรบนพื้นสีเหลือง */
+val OnAccent = Color(0xFF1C1600)
 val TextSecondary = Color(0xFFA9A9AD)
 
 private val scheme = darkColorScheme(
     primary = AppAccent,
-    onPrimary = Color(0xFF3A1020),
-    secondary = Color(0xFFD9C3C4),
+    onPrimary = OnAccent,
+    secondary = Color(0xFFE8DDB0),
     background = AppBg,
     onBackground = Color.White,
     surface = AppBg,
