@@ -150,6 +150,20 @@ class PlayerConnection(private val context: Context, private val scope: Coroutin
         c.play()
     }
 
+    /** แทรกเพลงไว้ถัดจากเพลงที่กำลังเล่น (ถ้ายังไม่มีคิวจะเริ่มเล่นเลย) */
+    fun playNext(tracks: List<Track>, displayTitle: (Track) -> String, displayArtist: (Track) -> String) {
+        val c = controller ?: return
+        if (tracks.isEmpty()) return
+        val items = tracks.map { it.toMediaItem(displayTitle(it), displayArtist(it)) }
+        if (c.mediaItemCount == 0) {
+            c.setMediaItems(items)
+            c.prepare()
+            c.play()
+        } else {
+            c.addMediaItems(c.currentMediaItemIndex + 1, items)
+        }
+    }
+
     fun playOrPause() {
         val c = controller ?: return
         if (c.isPlaying) c.pause() else {

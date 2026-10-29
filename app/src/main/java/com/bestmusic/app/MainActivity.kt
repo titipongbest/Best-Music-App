@@ -65,6 +65,7 @@ import com.bestmusic.app.ui.HomeScreen
 import com.bestmusic.app.ui.LyricsScreen
 import com.bestmusic.app.ui.MiniPlayer
 import com.bestmusic.app.ui.PlayerScreen
+import com.bestmusic.app.ui.SearchScreen
 import com.bestmusic.app.ui.TextSecondary
 import com.bestmusic.app.ui.TrackListScreen
 import com.bestmusic.app.ui.TrackMoreSheet
@@ -75,7 +76,7 @@ class MainActivity : ComponentActivity(), ActivityActions {
 
     private var hasPermission by mutableStateOf(false)
     private var openPlayerRequest by mutableStateOf(false)
-    private var pendingDelete: Track? = null
+    private var pendingDelete: List<Track> = emptyList()
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
@@ -85,11 +86,11 @@ class MainActivity : ComponentActivity(), ActivityActions {
 
     private val deleteLauncher =
         registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-            val t = pendingDelete
-            pendingDelete = null
-            if (result.resultCode == Activity.RESULT_OK && t != null) {
-                vm.confirmDeleted(t)
-                toast("ลบแล้ว")
+            val list = pendingDelete
+            pendingDelete = emptyList()
+            if (result.resultCode == Activity.RESULT_OK && list.isNotEmpty()) {
+                vm.confirmDeleted(list)
+                toast(if (list.size == 1) "ลบแล้ว" else "ลบแล้ว ${list.size} ไฟล์")
             }
         }
 
@@ -161,15 +162,33 @@ class MainActivity : ComponentActivity(), ActivityActions {
         startActivity(Intent.createChooser(send, "แบ่งปัน \"${track.title}\""))
     }
 
-    override fun delete(track: Track) {
-        when (val r = vm.requestDelete(track)) {
+    override fun delete(track: Track) = deleteMany(listOf(track))
+
+    override fun deleteMany(tracks: List<Track>) {
+        when (val r = vm.requestDelete(tracks)) {
             is MainViewModel.DeleteResult.NeedsConfirm -> {
-                pendingDelete = track
+                pendingDelete = tracks
                 deleteLauncher.launch(IntentSenderRequest.Builder(r.sender).build())
             }
-            MainViewModel.DeleteResult.Done -> toast("ลบแล้ว")
+            is MainViewModel.DeleteResult.Done ->
+                if (r.count > 0) toast(if (r.count == 1) "ลบแล้ว" else "ลบแล้ว ${r.count} ไฟล์")
             MainViewModel.DeleteResult.Failed -> toast("ลบไฟล์ไม่สำเร็จ")
         }
+    }
+
+    override fun shareMany(tracks: List<Track>) {
+        if (tracks.isEmpty()) return
+        if (tracks.size == 1) return share(tracks.first())
+        val send = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+            type = when {
+                tracks.all { it.isVideo } -> "video/*"
+                tracks.none { it.isVideo } -> "audio/*"
+                else -> "*/*"
+            }
+            putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList<Uri>(tracks.map { it.uri }))
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        startActivity(Intent.createChooser(send, "แบ่งปัน ${tracks.size} รายการ"))
     }
 
     override fun requestWriteSettings() {
@@ -195,6 +214,7 @@ private object Routes {
     const val PLAYER = "player"
     const val LYRICS = "lyrics"
     const val VIDEO = "video"
+    const val SEARCH = "search"
     fun folder(path: String) = "folder/${Uri.encode(path)}"
     fun playlist(name: String) = "playlist/${Uri.encode(name)}"
 }
@@ -213,6 +233,7 @@ private fun BestMusicApp(
     val backStack by nav.currentBackStackEntryAsState()
     val route = backStack?.destination?.route
     val current by vm.currentTrack.collectAsState()
+    val selecting by vm.selectionActive.collectAsState()
 
     LaunchedEffect(openPlayerRequest) {
         if (openPlayerRequest) {
@@ -228,9 +249,9 @@ private fun BestMusicApp(
         Box(Modifier.weight(1f)) {
             AppNavHost(nav, vm, actions, openPlayer, openMore) { t, c -> sheet = SheetRequest(t, c) }
         }
-        val showMini = current != null && route in setOf(Routes.HOME, Routes.FOLDER, Routes.PLAYLIST)
+        val showMini = current != null && !selecting && route in setOf(Routes.HOME, Routes.FOLDER, Routes.PLAYLIST, Routes.SEARCH)
         if (showMini) Box(Modifier.navigationBarsPadding()) { MiniPlayer(vm, onOpen = openPlayer) }
-        else if (route != Routes.PLAYER && route != Routes.LYRICS && route != Routes.VIDEO) Spacer(Modifier.navigationBarsPadding())
+        else if (!selecting && route != Routes.PLAYER && route != Routes.LYRICS && route != Routes.VIDEO) Spacer(Modifier.navigationBarsPadding())
     }
 
     sheet?.let { req ->
@@ -259,6 +280,16 @@ private fun AppNavHost(
                 onOpenFolder = { nav.navigate(Routes.folder(it)) },
                 onOpenPlaylist = { nav.navigate(Routes.playlist(it)) },
                 onOpenPlayer = openPlayer,
+                onOpenSearch = { nav.navigate(Routes.SEARCH) },
+                onMore = openMore,
+            )
+        }
+        composable(Routes.SEARCH) {
+            SearchScreen(
+                vm = vm,
+                onBack = { nav.popBackStack() },
+                onOpenFolder = { nav.navigate(Routes.folder(it)) },
+                onOpenPlayer = openPlayer,
                 onMore = openMore,
             )
         }
@@ -273,6 +304,7 @@ private fun AppNavHost(
                 } ?: "",
                 tracks = folder?.tracks ?: emptyList(),
                 vm = vm,
+                actions = actions,
                 onBack = { nav.popBackStack() },
                 onOpenPlayer = openPlayer,
                 onMore = openMore,
@@ -291,6 +323,7 @@ private fun AppNavHost(
                 subtitle = "${tracks.size} รายการ",
                 tracks = tracks,
                 vm = vm,
+                actions = actions,
                 onBack = { nav.popBackStack() },
                 onOpenPlayer = openPlayer,
                 onMore = openMore,

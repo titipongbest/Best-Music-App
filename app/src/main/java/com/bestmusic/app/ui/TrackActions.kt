@@ -71,6 +71,8 @@ import com.bestmusic.app.playback.PlayerState
 interface ActivityActions {
     fun share(track: Track)
     fun delete(track: Track)
+    fun shareMany(tracks: List<Track>)
+    fun deleteMany(tracks: List<Track>)
     fun requestWriteSettings()
     fun toast(msg: String)
 }

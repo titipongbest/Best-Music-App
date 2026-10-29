@@ -12,6 +12,7 @@ import androidx.lifecycle.viewModelScope
 import com.bestmusic.app.data.Folder
 import com.bestmusic.app.data.MediaScanner
 import com.bestmusic.app.data.Playlist
+import com.bestmusic.app.data.SortOrder
 import com.bestmusic.app.data.Track
 import com.bestmusic.app.data.UserPrefs
 import com.bestmusic.app.playback.PlayMode
@@ -152,37 +153,84 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }.getOrDefault(false)
 
     sealed interface DeleteResult {
-        data object Done : DeleteResult
+        data class Done(val count: Int) : DeleteResult
         data class NeedsConfirm(val sender: IntentSender) : DeleteResult
         data object Failed : DeleteResult
     }
 
     /** ลบไฟล์จริงออกจากเครื่อง (Android 10+ ระบบจะให้ผู้ใช้กดยืนยันก่อน) */
-    fun requestDelete(track: Track): DeleteResult {
+    fun requestDelete(tracks: List<Track>): DeleteResult {
+        if (tracks.isEmpty()) return DeleteResult.Done(0)
         val resolver = getApplication<Application>().contentResolver
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            return DeleteResult.NeedsConfirm(MediaStore.createDeleteRequest(resolver, listOf(track.uri)).intentSender)
+            return DeleteResult.NeedsConfirm(
+                MediaStore.createDeleteRequest(resolver, tracks.map { it.uri }).intentSender,
+            )
         }
-        return try {
-            val rows = resolver.delete(track.uri, null, null)
-            if (rows > 0) { onDeleted(track); DeleteResult.Done } else DeleteResult.Failed
-        } catch (e: SecurityException) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && e is RecoverableSecurityException) {
-                DeleteResult.NeedsConfirm(e.userAction.actionIntent.intentSender)
-            } else DeleteResult.Failed
+        val deleted = ArrayList<Track>()
+        var recoverable: IntentSender? = null
+        for (t in tracks) {
+            try {
+                if (resolver.delete(t.uri, null, null) > 0) deleted += t
+            } catch (e: SecurityException) {
+                // Android 10 ขอยืนยันได้ทีละไฟล์
+                if (recoverable == null && tracks.size == 1 &&
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && e is RecoverableSecurityException
+                ) recoverable = e.userAction.actionIntent.intentSender
+            }
         }
+        onDeleted(deleted)
+        recoverable?.let { return DeleteResult.NeedsConfirm(it) }
+        return if (deleted.isEmpty()) DeleteResult.Failed else DeleteResult.Done(deleted.size)
     }
 
-    /** เรียกหลังผู้ใช้ยืนยันการลบ */
-    fun confirmDeleted(track: Track) {
+    /** เรียกหลังผู้ใช้ยืนยันการลบในหน้าต่างของระบบ */
+    fun confirmDeleted(tracks: List<Track>) {
         if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q) {
-            runCatching { getApplication<Application>().contentResolver.delete(track.uri, null, null) }
+            tracks.forEach { t -> runCatching { getApplication<Application>().contentResolver.delete(t.uri, null, null) } }
         }
-        onDeleted(track)
+        onDeleted(tracks)
     }
 
-    private fun onDeleted(track: Track) {
-        player.removeFromQueue(track.key)
-        _rawTracks.value = _rawTracks.value.filterNot { it.key == track.key }
+    private fun onDeleted(tracks: List<Track>) {
+        if (tracks.isEmpty()) return
+        val keys = tracks.map { it.key }.toSet()
+        keys.forEach { player.removeFromQueue(it) }
+        _rawTracks.value = _rawTracks.value.filterNot { it.key in keys }
+    }
+
+    // ---------------- Multi-select ----------------
+
+    /** true ระหว่างอยู่ในโหมดเลือกหลายเพลง (ซ่อนมินิเพลเยอร์) */
+    val selectionActive = MutableStateFlow(false)
+
+    fun playNext(tracks: List<Track>) = player.playNext(tracks, { it.title }, { it.artist })
+
+    fun addAllToPlaylist(name: String, tracks: List<Track>) = prefs.addAllToPlaylist(name.trim(), tracks.map { it.key })
+
+    fun hideAll(tracks: List<Track>) {
+        prefs.hideAll(tracks.map { it.key })
+        tracks.forEach { player.removeFromQueue(it.key) }
+    }
+
+    val sortOrder: StateFlow<SortOrder> = prefs.sortOrder
+    fun setSortOrder(order: SortOrder) = prefs.setSortOrder(order)
+
+    /** ค้นหาจากชื่อเพลง ศิลปิน อัลบั้ม และชื่อโฟลเดอร์ */
+    fun search(query: String): List<Track> {
+        val q = query.trim()
+        if (q.isEmpty()) return emptyList()
+        val words = q.lowercase().split(Regex("\\s+"))
+        return tracks.value.filter { t ->
+            val hay = "${t.title} ${t.artist} ${t.album} ${t.folderName}".lowercase()
+            words.all { it in hay }
+        }.sortedByDescending { t ->
+            when {
+                t.title.startsWith(q, ignoreCase = true) -> 3
+                t.title.contains(q, ignoreCase = true) -> 2
+                t.artist.contains(q, ignoreCase = true) -> 1
+                else -> 0
+            }
+        }
     }
 }

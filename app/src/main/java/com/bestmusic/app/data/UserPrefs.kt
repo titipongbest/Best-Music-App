@@ -31,6 +31,16 @@ class UserPrefs(context: Context) {
     private val _batterySaver = MutableStateFlow(sp.getBoolean(K_SAVER, false))
     val batterySaver: StateFlow<Boolean> = _batterySaver.asStateFlow()
 
+    private val _sortOrder = MutableStateFlow(
+        runCatching { SortOrder.valueOf(sp.getString(K_SORT, SortOrder.DEFAULT.name)!!) }.getOrDefault(SortOrder.DEFAULT),
+    )
+    val sortOrder: StateFlow<SortOrder> = _sortOrder.asStateFlow()
+
+    fun setSortOrder(order: SortOrder) {
+        _sortOrder.value = order
+        sp.edit().putString(K_SORT, order.name).apply()
+    }
+
     // ---------- Favorites ----------
     fun toggleFavorite(key: String) {
         val s = _favorites.value.toMutableSet()
@@ -40,8 +50,10 @@ class UserPrefs(context: Context) {
     }
 
     // ---------- Hidden ----------
-    fun hide(key: String) {
-        val s = _hidden.value + key
+    fun hide(key: String) = hideAll(listOf(key))
+
+    fun hideAll(keys: Collection<String>) {
+        val s = _hidden.value + keys
         _hidden.value = s
         sp.edit().putStringSet(K_HIDDEN, s).apply()
     }
@@ -60,9 +72,15 @@ class UserPrefs(context: Context) {
         savePlaylists(_playlists.value + Playlist(name, listOfNotNull(firstKey)))
     }
 
-    fun addToPlaylist(name: String, key: String) {
-        savePlaylists(_playlists.value.map {
-            if (it.name == name && key !in it.keys) it.copy(keys = it.keys + key) else it
+    fun addToPlaylist(name: String, key: String) = addAllToPlaylist(name, listOf(key))
+
+    fun addAllToPlaylist(name: String, keys: List<String>) {
+        if (_playlists.value.none { it.name == name }) {
+            savePlaylists(_playlists.value + Playlist(name, keys.distinct()))
+            return
+        }
+        savePlaylists(_playlists.value.map { p ->
+            if (p.name == name) p.copy(keys = p.keys + keys.filter { it !in p.keys }.distinct()) else p
         })
     }
 
@@ -128,5 +146,6 @@ class UserPrefs(context: Context) {
         const val K_PLAYLISTS = "playlists"
         const val K_OVERRIDES = "overrides"
         const val K_SAVER = "battery_saver"
+        const val K_SORT = "sort_order"
     }
 }

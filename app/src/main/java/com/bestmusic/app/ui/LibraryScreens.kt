@@ -29,6 +29,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Checklist
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Pause
@@ -46,6 +48,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -74,6 +77,7 @@ fun HomeScreen(
     onOpenFolder: (String) -> Unit,
     onOpenPlaylist: (String) -> Unit,
     onOpenPlayer: () -> Unit,
+    onOpenSearch: () -> Unit,
     onMore: (Track) -> Unit,
 ) {
     val folders by vm.folders.collectAsState()
@@ -91,6 +95,7 @@ fun HomeScreen(
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 4.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("Best music", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = AppAccent, modifier = Modifier.weight(1f))
             if (loading) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp, color = AppAccent)
+            IconButton(onClick = onOpenSearch) { Icon(Icons.Rounded.Search, "ค้นหา", tint = Color.White) }
             IconButton(onClick = { vm.scan() }) { Icon(Icons.Rounded.Refresh, "สแกนใหม่", tint = TextSecondary) }
             Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "เมนู", tint = TextSecondary) }
@@ -246,7 +251,13 @@ private fun VideoCard(v: Track, isCurrent: Boolean, onClick: () -> Unit, onMore:
 }
 
 @Composable
-private fun TrackList(list: List<Track>, vm: MainViewModel, onOpenPlayer: () -> Unit, onMore: (Track) -> Unit) {
+private fun TrackList(
+    list: List<Track>,
+    vm: MainViewModel,
+    onOpenPlayer: () -> Unit,
+    onMore: (Track) -> Unit,
+    onLongPress: ((Track) -> Unit)? = null,
+) {
     val state by vm.playerState.collectAsState()
     LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
         itemsIndexed(list, key = { _, t -> t.key }) { i, t ->
@@ -254,28 +265,59 @@ private fun TrackList(list: List<Track>, vm: MainViewModel, onOpenPlayer: () -> 
                 t, isCurrent = t.key == state.currentKey, isPlaying = state.isPlaying,
                 onClick = { vm.play(list, i); onOpenPlayer() },
                 onMore = { onMore(t) },
+                onLongClick = onLongPress?.let { f -> { f(t) } },
             )
         }
     }
 }
 
-/** หน้ารายการเพลงในโฟลเดอร์ / เพลย์ลิสต์ */
+/** หน้ารายการเพลงในโฟลเดอร์ / เพลย์ลิสต์ (มีปุ่มเรียงลำดับและเลือกหลายรายการ) */
 @Composable
 fun TrackListScreen(
     title: String,
     subtitle: String,
     tracks: List<Track>,
     vm: MainViewModel,
+    actions: ActivityActions,
     onBack: () -> Unit,
     onOpenPlayer: () -> Unit,
     onMore: (Track) -> Unit,
     extraMenu: (@Composable (dismiss: () -> Unit) -> Unit)? = null,
 ) {
     var menu by remember { mutableStateOf(false) }
+    val order by vm.sortOrder.collectAsState()
+    val sorted = remember(tracks, order) { order.apply(tracks) }
+    var selecting by rememberSaveable { mutableStateOf(false) }
+    var initialSelection by rememberSaveable { mutableStateOf(listOf<String>()) }
+
+    DisposableEffect(selecting) {
+        vm.selectionActive.value = selecting
+        onDispose { vm.selectionActive.value = false }
+    }
+
+    if (selecting) {
+        SelectionScreen(
+            tracks = sorted,
+            initialSelected = initialSelection.toSet(),
+            vm = vm,
+            actions = actions,
+            onExit = { selecting = false },
+        )
+        return
+    }
+    val startSelect = { first: Track? ->
+        initialSelection = listOfNotNull(first?.key)
+        selecting = true
+    }
+
     Column(Modifier.fillMaxSize().background(AppBg).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "กลับ", tint = Color.White) }
             Spacer(Modifier.weight(1f))
+            SortButton(vm)
+            IconButton(onClick = { startSelect(null) }, enabled = tracks.isNotEmpty()) {
+                Icon(Icons.Rounded.Checklist, "เลือก", tint = TextSecondary)
+            }
             if (extraMenu != null) Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "เมนู", tint = TextSecondary) }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) { extraMenu { menu = false } }
@@ -291,8 +333,8 @@ fun TrackListScreen(
         }
         Row(Modifier.padding(horizontal = 20.dp, vertical = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(
-                onClick = { vm.play(tracks, 0); onOpenPlayer() },
-                enabled = tracks.isNotEmpty(),
+                onClick = { vm.play(sorted, 0); onOpenPlayer() },
+                enabled = sorted.isNotEmpty(),
                 colors = ButtonDefaults.buttonColors(containerColor = AppAccent, contentColor = Color(0xFF2A1520)),
                 modifier = Modifier.weight(1f).height(48.dp),
             ) {
@@ -301,8 +343,8 @@ fun TrackListScreen(
                 Text("เล่นทั้งหมด", fontWeight = FontWeight.Bold)
             }
             OutlinedButton(
-                onClick = { if (tracks.isNotEmpty()) { vm.play(tracks.shuffled(), 0); onOpenPlayer() } },
-                enabled = tracks.isNotEmpty(),
+                onClick = { if (sorted.isNotEmpty()) { vm.play(sorted.shuffled(), 0); onOpenPlayer() } },
+                enabled = sorted.isNotEmpty(),
                 modifier = Modifier.weight(1f).height(48.dp),
             ) {
                 Icon(Icons.Rounded.Shuffle, null, tint = AppAccent)
@@ -310,7 +352,7 @@ fun TrackListScreen(
                 Text("สุ่มเล่น", color = AppAccent, fontWeight = FontWeight.Bold)
             }
         }
-        Box(Modifier.weight(1f)) { TrackList(tracks, vm, onOpenPlayer, onMore) }
+        Box(Modifier.weight(1f)) { TrackList(sorted, vm, onOpenPlayer, onMore, onLongPress = { startSelect(it) }) }
     }
 }
 
