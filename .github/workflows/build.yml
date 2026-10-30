@@ -31,15 +31,10 @@ jobs:
 
       - name: Check keystore
         env:
-          ALL_SECRETS: ${{ toJSON(secrets) }} # ใช้แสดงเฉพาะ "ชื่อ" secret เมื่อหาไม่เจอ
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          if [ -z "$KEYSTORE_PASSWORD" ]; then
-            names=$(printf '%s' "$ALL_SECRETS" | jq -r 'keys | map(select(. != "github_token")) | join(", ")')
-            echo "::error::ไม่พบ secret KEYSTORE_PASSWORD (secret ที่มีอยู่: $names)"
-            exit 1
-          fi
+          [ -n "$KEYSTORE_PASSWORD" ] || { echo "::error::ไม่พบ secret KEYSTORE_PASSWORD"; exit 1; }
           if ! keytool -list -keystore "$KEYSTORE_FILE" -storepass "$KEYSTORE_PASSWORD" > "$RUNNER_TEMP/ks.txt" 2>&1; then
             echo "::error::เปิด keystore ไม่ได้: $(grep -iE 'error|exception' "$RUNNER_TEMP/ks.txt" | head -1)"
             exit 1
