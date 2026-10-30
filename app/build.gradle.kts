@@ -10,6 +10,10 @@ val commitCount: Int = runCatching {
         .standardOutput.asText.get().trim().toInt()
 }.getOrDefault(1)
 
+base {
+    archivesName.set("BestMusic-v1.0.$commitCount")
+}
+
 android {
     namespace = "com.bestmusic.app"
     compileSdk = 35
@@ -22,12 +26,28 @@ android {
         versionName = "1.0.$commitCount"
     }
 
+    // คีย์ release มาจาก GitHub Secrets (ดู .github/workflows/build.yml)
+    // ถ้า build ในเครื่องโดยไม่ได้ตั้งค่าไว้ จะ sign ด้วย debug key แทน
+    val env = { name: String -> System.getenv(name)?.takeIf { it.isNotBlank() } }
+    val releaseKeystore = env("KEYSTORE_FILE")?.let { file(it) }?.takeIf { it.exists() }
+
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = env("KEYSTORE_PASSWORD")
+                keyAlias = env("KEY_ALIAS") ?: "bestmusic"
+                keyPassword = env("KEY_PASSWORD") ?: env("KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // ใช้ debug key เพื่อให้ติดตั้ง APK release ได้ทันที (เปลี่ยนเป็น key ของคุณก่อนลง Play Store)
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (releaseKeystore != null) signingConfigs.getByName("release")
+            else signingConfigs.getByName("debug")
         }
     }
 
