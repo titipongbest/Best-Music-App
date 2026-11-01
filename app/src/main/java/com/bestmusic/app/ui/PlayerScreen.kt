@@ -3,6 +3,7 @@ package com.bestmusic.app.ui
 import android.content.Intent
 import android.media.audiofx.AudioEffect
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -18,6 +19,7 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -114,6 +116,7 @@ fun PlayerScreen(
 
     var showVideo by rememberSaveable(track?.key) { mutableStateOf(true) }
     var showQueue by remember { mutableStateOf(false) }
+    var seekFx by remember { mutableStateOf<SeekFx?>(null) }
     var dragY by remember { mutableFloatStateOf(0f) }
     val density = LocalDensity.current
 
@@ -149,7 +152,27 @@ fun PlayerScreen(
             Box(
                 Modifier
                     .heightIn(max = maxArt)
-                    .aspectRatio(1f, matchHeightConstraintsFirst = true),
+                    .aspectRatio(1f, matchHeightConstraintsFirst = true)
+                    // ดับเบิลแตะฝั่งซ้าย = ย้อน 5 วิ, ฝั่งขวา = เดินหน้า 5 วิ
+                    .pointerInput(Unit) {
+                        detectTapGestures(onDoubleTap = { o ->
+                            val forward = o.x > size.width / 2f
+                            vm.seekBy(if (forward) 5_000L else -5_000L)
+                            val now = System.currentTimeMillis()
+                            val same = seekFx?.forward == forward && now - (seekFx?.at ?: 0L) < 900
+                            seekFx = SeekFx(forward, if (same) seekFx!!.seconds + 5 else 5, now)
+                        })
+                    }
+                    // ปัดซ้าย/ขวาบนปกเพื่อเปลี่ยนเพลง
+                    .pointerInput(track?.key) {
+                        var total = 0f
+                        detectHorizontalDragGestures(
+                            onDragStart = { total = 0f },
+                            onDragEnd = {
+                                if (total < -120) vm.next() else if (total > 120) vm.previous()
+                            },
+                        ) { _, d -> total += d }
+                    },
                 contentAlignment = Alignment.Center,
             ) {
                 AnimatedContent(
@@ -170,23 +193,14 @@ fun PlayerScreen(
                     } else {
                         Artwork(
                             track,
-                            Modifier
-                                .fillMaxSize()
-                                .pointerInput(track?.key) {
-                                    var total = 0f
-                                    detectHorizontalDragGestures(
-                                        onDragStart = { total = 0f },
-                                        onDragEnd = {
-                                            if (total < -120) vm.next() else if (total > 120) vm.previous()
-                                        },
-                                    ) { _, d -> total += d }
-                                },
+                            Modifier.fillMaxSize(),
                             shape = RoundedCornerShape(28.dp),
                             sizePx = 1024,
                             iconSize = 96.dp,
                         )
                     }
                 }
+                SeekFeedback(seekFx) { seekFx = null }
                 if (isVideo && !batterySaver) {
                     Row(
                         Modifier
@@ -329,6 +343,50 @@ fun PlayerScreen(
     }
 
     if (showQueue) QueueSheet(vm, colors) { showQueue = false }
+}
+
+private data class SeekFx(val forward: Boolean, val seconds: Int, val at: Long)
+
+/** วงกลมจาง ๆ พร้อม "« 5 วิ" / "5 วิ »" ฝั่งที่แตะ แล้วค่อย ๆ หายไป */
+@Composable
+private fun BoxScope.SeekFeedback(fx: SeekFx?, onDone: () -> Unit) {
+    LaunchedEffect(fx) {
+        if (fx != null) {
+            kotlinx.coroutines.delay(700)
+            onDone()
+        }
+    }
+    // จำค่าล่าสุดไว้แสดงระหว่างกำลังจางหาย (ไม่ใช่ state จึงเขียนระหว่าง composition ได้)
+    val lastFx = remember { object { var v: SeekFx? = null } }
+    if (fx != null) lastFx.v = fx
+    AnimatedVisibility(
+        visible = fx != null,
+        enter = fadeIn(tween(120)),
+        exit = fadeOut(tween(300)),
+        modifier = Modifier.matchParentSize(),
+    ) {
+        val f = lastFx.v ?: return@AnimatedVisibility
+        Box(Modifier.fillMaxSize().clip(RoundedCornerShape(28.dp))) {
+            Box(
+                Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(0.5f)
+                    .align(if (f.forward) Alignment.CenterEnd else Alignment.CenterStart)
+                    .background(Color.Black.copy(alpha = 0.28f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (!f.forward) Icon(Icons.Rounded.FastRewind, null, tint = Color.White, modifier = Modifier.size(30.dp))
+                    Text(
+                        "${f.seconds} วิ",
+                        color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 6.dp),
+                    )
+                    if (f.forward) Icon(Icons.Rounded.FastForward, null, tint = Color.White, modifier = Modifier.size(30.dp))
+                }
+            }
+        }
+    }
 }
 
 @Composable

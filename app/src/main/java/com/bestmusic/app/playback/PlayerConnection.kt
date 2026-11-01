@@ -182,6 +182,15 @@ class PlayerConnection(private val context: Context, private val scope: Coroutin
         _state.value = _state.value.copy(positionMs = ms)
     }
 
+    /** เลื่อนไปข้างหน้า/ถอยหลังจากตำแหน่งปัจจุบัน (ms) */
+    fun seekBy(deltaMs: Long) {
+        val c = controller ?: return
+        val dur = c.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: Long.MAX_VALUE
+        val target = (c.currentPosition + deltaMs).coerceIn(0L, (dur - 500).coerceAtLeast(0L))
+        c.seekTo(target)
+        _state.value = _state.value.copy(positionMs = target)
+    }
+
     fun skipToQueueIndex(i: Int) {
         controller?.seekTo(i, 0)
     }

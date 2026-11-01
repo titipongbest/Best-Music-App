@@ -121,6 +121,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun next() = player.next()
     fun previous() = player.previous()
     fun seekTo(ms: Long) = player.seekTo(ms)
+    fun seekBy(deltaMs: Long) = player.seekBy(deltaMs)
     fun cycleMode(): PlayMode = player.cycleMode()
     fun setSpeed(speed: Float) = player.setSpeed(speed)
     fun setSleepTimer(minutes: Int) = player.setSleepTimer(minutes)
