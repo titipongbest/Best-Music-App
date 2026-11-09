@@ -2,7 +2,12 @@ name: Build APK
 
 on:
   push:
+    branches: ["**"]
+    tags: ["v*"]   # push tag เช่น v1.0.13 เพื่อสร้าง GitHub Release
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -70,3 +75,14 @@ jobs:
       - name: Remove keystore
         if: always()
         run: rm -f "$RUNNER_TEMP/release.jks"
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" app/build/outputs/apk/release/*.apk \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Best music $TAG" \
+            --notes-file .github/release-notes.md
