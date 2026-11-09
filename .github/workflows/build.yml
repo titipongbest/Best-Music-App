@@ -5,6 +5,11 @@ on:
     branches: ["**"]
     tags: ["v*"]   # push tag เช่น v1.0.13 เพื่อสร้าง GitHub Release
   workflow_dispatch:
+    inputs:
+      release:
+        description: "สร้าง GitHub Release จาก build นี้"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -77,12 +82,15 @@ jobs:
         run: rm -f "$RUNNER_TEMP/release.jks"
 
       - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
         run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then TAG="$GITHUB_REF_NAME"; else TAG="v1.0.$(git rev-list --count HEAD)"; fi
           gh release create "$TAG" app/build/outputs/apk/release/*.apk \
             --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
             --title "Best music $TAG" \
-            --notes-file .github/release-notes.md
+            --notes-file .github/release-notes.md \
+            --latest
+          echo "::notice::สร้าง Release $TAG แล้ว"
